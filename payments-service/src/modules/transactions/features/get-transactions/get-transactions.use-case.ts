@@ -10,12 +10,17 @@ import {
 export class GetTransactionsUseCase {
   constructor(private readonly prisma: PrismaService) {}
 
-  async execute(input: GetTransactionsInput): Promise<GetTransactionsOutput> {
+  async execute(
+    input: GetTransactionsInput,
+    merchantId: string,
+  ): Promise<GetTransactionsOutput> {
     const page = Math.max(1, Math.trunc(input.page ?? 1));
     const limit = Math.min(100, Math.max(1, Math.trunc(input.limit ?? 20)));
     const skip = (page - 1) * limit;
 
-    const where: Prisma.TransactionWhereInput = {};
+    const where: Prisma.TransactionWhereInput = {
+      merchant_id: merchantId,
+    };
 
     if (input.status) {
       where.status = input.status;
