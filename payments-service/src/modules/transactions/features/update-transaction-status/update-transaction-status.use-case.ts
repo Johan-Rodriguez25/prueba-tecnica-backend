@@ -18,11 +18,12 @@ export class UpdateTransactionStatusUseCase {
   async execute(
     params: UpdateTransactionStatusParams,
     body: UpdateTransactionStatusBody,
+    merchantId: string,
   ): Promise<UpdateTransactionStatusOutput> {
     const id = params.id.trim();
 
-    const transaction = await this.prisma.transaction.findUnique({
-      where: { id },
+    const transaction = await this.prisma.transaction.findFirst({
+      where: { id, merchant_id: merchantId },
       select: {
         id: true,
         merchant_id: true,

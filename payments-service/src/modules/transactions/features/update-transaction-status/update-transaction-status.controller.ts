@@ -1,11 +1,17 @@
-import { Body, Controller, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Param, Patch, UseGuards } from '@nestjs/common';
 import {
   ApiBody,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  ApiKeyAuthGuard,
+  type AuthenticatedMerchant,
+} from '@/auth/api-key-auth.guard';
+import { CurrentMerchant } from '@/auth/current-merchant.decorator';
 import {
   UpdateTransactionStatusBody,
   UpdateTransactionStatusOutput,
@@ -14,7 +20,9 @@ import {
 import { UpdateTransactionStatusUseCase } from './update-transaction-status.use-case';
 
 @ApiTags('transactions')
+@ApiSecurity('api-key')
 @Controller({ path: 'transactions', version: '1' })
+@UseGuards(ApiKeyAuthGuard)
 export class UpdateTransactionStatusController {
   constructor(
     private readonly updateTransactionStatusUseCase: UpdateTransactionStatusUseCase,
@@ -32,7 +40,12 @@ export class UpdateTransactionStatusController {
   async updateStatus(
     @Param() params: UpdateTransactionStatusParams,
     @Body() body: UpdateTransactionStatusBody,
+    @CurrentMerchant() merchant: AuthenticatedMerchant,
   ): Promise<UpdateTransactionStatusOutput> {
-    return this.updateTransactionStatusUseCase.execute(params, body);
+    return this.updateTransactionStatusUseCase.execute(
+      params,
+      body,
+      merchant.id,
+    );
   }
 }
