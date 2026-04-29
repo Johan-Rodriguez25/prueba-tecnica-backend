@@ -23,6 +23,7 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Payments Service')
     .setVersion('1.0')
+    .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'api-key')
     .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
