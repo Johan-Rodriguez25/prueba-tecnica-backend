@@ -36,4 +36,3 @@ export class UpdateTransactionStatusController {
     return this.updateTransactionStatusUseCase.execute(params, body);
   }
 }
-

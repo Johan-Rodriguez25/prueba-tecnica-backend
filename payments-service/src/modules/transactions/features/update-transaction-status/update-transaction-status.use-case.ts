@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { TransactionStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -45,8 +45,8 @@ export class UpdateTransactionStatusUseCase {
     const currentStatus = transaction.status;
 
     if (!this.isValidTransition(currentStatus, nextStatus)) {
-      throw new BadRequestException(
-        `invalid status transition from ${currentStatus} to ${nextStatus}`,
+      throw new UnprocessableEntityException(
+        `Transicion de estado invalida: no se puede cambiar de '${currentStatus}' a '${nextStatus}'`,
       );
     }
 

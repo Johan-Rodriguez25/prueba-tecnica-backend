@@ -12,18 +12,10 @@ export class GetTransactionsUseCase {
 
   async execute(input: GetTransactionsInput): Promise<GetTransactionsOutput> {
     const page = Math.max(1, Math.trunc(input.page ?? 1));
-    const pageSize = Math.min(
-      100,
-      Math.max(1, Math.trunc(input.pageSize ?? 20)),
-    );
-    const skip = (page - 1) * pageSize;
+    const limit = Math.min(100, Math.max(1, Math.trunc(input.limit ?? 20)));
+    const skip = (page - 1) * limit;
 
     const where: Prisma.TransactionWhereInput = {};
-
-    const merchantId = input.merchantId?.trim();
-    if (merchantId) {
-      where.merchant_id = merchantId;
-    }
 
     if (input.status) {
       where.status = input.status;
@@ -33,41 +25,16 @@ export class GetTransactionsUseCase {
       where.type = input.type;
     }
 
-    if (input.currency) {
-      where.currency = input.currency;
-    }
-
-    const reference = input.reference?.trim();
-    if (reference) {
-      where.reference = { contains: reference, mode: 'insensitive' };
-    }
-
-    const createdFrom = this.parseDate(input.createdFrom, 'createdFrom');
-    const createdTo = this.parseDate(input.createdTo, 'createdTo');
-    if (createdFrom || createdTo) {
+    const dateFrom = this.parseDate(input.date_from, 'date_from');
+    const dateTo = this.parseDate(input.date_to, 'date_to');
+    if (dateFrom || dateTo) {
       where.created_at = {};
-      if (createdFrom) where.created_at.gte = createdFrom;
-      if (createdTo) where.created_at.lte = createdTo;
+      if (dateFrom) where.created_at.gte = dateFrom;
+      if (dateTo) where.created_at.lte = dateTo;
     }
 
-    const minAmount = this.parseDecimal(input.minAmount, 'minAmount');
-    const maxAmount = this.parseDecimal(input.maxAmount, 'maxAmount');
-    if (minAmount || maxAmount) {
-      where.amount = {};
-      if (minAmount) where.amount.gte = minAmount;
-      if (maxAmount) where.amount.lte = maxAmount;
-    }
-
-    if (minAmount && maxAmount && minAmount.gt(maxAmount)) {
-      throw new BadRequestException(
-        'minAmount cannot be greater than maxAmount',
-      );
-    }
-
-    if (createdFrom && createdTo && createdFrom > createdTo) {
-      throw new BadRequestException(
-        'createdFrom cannot be greater than createdTo',
-      );
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      throw new BadRequestException('date_from cannot be greater than date_to');
     }
 
     const [total, transactions] = await this.prisma.$transaction([
@@ -76,7 +43,7 @@ export class GetTransactionsUseCase {
         where,
         orderBy: { created_at: 'desc' },
         skip,
-        take: pageSize,
+        take: limit,
         select: {
           id: true,
           merchant_id: true,
@@ -91,10 +58,10 @@ export class GetTransactionsUseCase {
       }),
     ]);
 
-    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
     return {
-      items: transactions.map((t) => ({
+      data: transactions.map((t) => ({
         id: t.id,
         merchantId: t.merchant_id,
         amount: t.amount.toString(),
@@ -105,10 +72,12 @@ export class GetTransactionsUseCase {
         metadata: (t.metadata as Record<string, unknown> | null) ?? undefined,
         createdAt: t.created_at.toISOString(),
       })),
-      page,
-      pageSize,
-      total,
-      totalPages,
+      meta: {
+        total,
+        page,
+        limit,
+        total_pages: totalPages,
+      },
     };
   }
 
@@ -122,19 +91,5 @@ export class GetTransactionsUseCase {
       throw new BadRequestException(`${fieldName} is invalid`);
     }
     return date;
-  }
-
-  private parseDecimal(
-    value: string | undefined,
-    fieldName: string,
-  ): Prisma.Decimal | undefined {
-    if (!value) return undefined;
-    const normalized = value.trim();
-    if (!/^\d+(\.\d{1,2})?$/.test(normalized)) {
-      throw new BadRequestException(
-        `${fieldName} must be a decimal with up to 2 decimals`,
-      );
-    }
-    return new Prisma.Decimal(normalized);
   }
 }
