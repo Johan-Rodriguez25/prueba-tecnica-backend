@@ -15,15 +15,6 @@ import {
 import { Type } from 'class-transformer';
 
 export class GetTransactionsInput {
-  @ApiPropertyOptional({
-    format: 'uuid',
-    description:
-      'Filtro opcional por merchant (exact match). Útil para listar las transacciones de un merchant.',
-  })
-  @IsOptional()
-  @IsUUID()
-  readonly merchantId?: string;
-
   @ApiPropertyOptional({ enum: TransactionStatus })
   @IsOptional()
   @IsEnum(TransactionStatus)
@@ -34,35 +25,15 @@ export class GetTransactionsInput {
   @IsEnum(TransactionType)
   readonly type?: TransactionType;
 
-  @ApiPropertyOptional({ enum: Currency })
-  @IsOptional()
-  @IsEnum(Currency)
-  readonly currency?: Currency;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  readonly reference?: string;
-
-  @ApiPropertyOptional({ format: 'date-time' })
+  @ApiPropertyOptional({ name: 'date_from', format: 'date-time' })
   @IsOptional()
   @IsDateString()
-  readonly createdFrom?: string;
+  readonly date_from?: string;
 
-  @ApiPropertyOptional({ format: 'date-time' })
+  @ApiPropertyOptional({ name: 'date_to', format: 'date-time' })
   @IsOptional()
   @IsDateString()
-  readonly createdTo?: string;
-
-  @ApiPropertyOptional({ example: '10.00' })
-  @IsOptional()
-  @Matches(/^\d+(\.\d{1,2})?$/)
-  readonly minAmount?: string;
-
-  @ApiPropertyOptional({ example: '250.00' })
-  @IsOptional()
-  @Matches(/^\d+(\.\d{1,2})?$/)
-  readonly maxAmount?: string;
+  readonly date_to?: string;
 
   @ApiPropertyOptional({ minimum: 1, default: 1 })
   @IsOptional()
@@ -77,7 +48,7 @@ export class GetTransactionsInput {
   @IsInt()
   @Min(1)
   @Max(100)
-  readonly pageSize?: number;
+  readonly limit?: number;
 }
 
 export class TransactionListItemOutput {
@@ -120,9 +91,11 @@ export class TransactionListItemOutput {
   readonly createdAt!: string;
 }
 
-export class GetTransactionsOutput {
-  @ApiProperty({ type: [TransactionListItemOutput] })
-  readonly items!: TransactionListItemOutput[];
+export class GetTransactionsMetaOutput {
+  @ApiProperty()
+  @IsInt()
+  @Min(0)
+  readonly total!: number;
 
   @ApiProperty()
   @IsInt()
@@ -132,15 +105,19 @@ export class GetTransactionsOutput {
   @ApiProperty()
   @IsInt()
   @Min(1)
-  readonly pageSize!: number;
+  @Max(100)
+  readonly limit!: number;
 
   @ApiProperty()
   @IsInt()
   @Min(0)
-  readonly total!: number;
+  readonly total_pages!: number;
+}
 
-  @ApiProperty()
-  @IsInt()
-  @Min(0)
-  readonly totalPages!: number;
+export class GetTransactionsOutput {
+  @ApiProperty({ type: [TransactionListItemOutput] })
+  readonly data!: TransactionListItemOutput[];
+
+  @ApiProperty({ type: GetTransactionsMetaOutput })
+  readonly meta!: GetTransactionsMetaOutput;
 }
