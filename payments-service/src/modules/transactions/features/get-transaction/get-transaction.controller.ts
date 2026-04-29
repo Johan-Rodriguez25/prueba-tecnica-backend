@@ -1,10 +1,16 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  ApiKeyAuthGuard,
+  type AuthenticatedMerchant,
+} from '@/auth/api-key-auth.guard';
+import { CurrentMerchant } from '@/auth/current-merchant.decorator';
 import {
   GetTransactionInput,
   GetTransactionOutput,
@@ -12,7 +18,9 @@ import {
 import { GetTransactionUseCase } from './get-transaction.use-case';
 
 @ApiTags('transactions')
+@ApiSecurity('api-key')
 @Controller({ path: 'transactions', version: '1' })
+@UseGuards(ApiKeyAuthGuard)
 export class GetTransactionController {
   constructor(private readonly getTransactionUseCase: GetTransactionUseCase) {}
 
@@ -26,7 +34,8 @@ export class GetTransactionController {
   @ApiOkResponse({ type: GetTransactionOutput })
   async get(
     @Param() params: GetTransactionInput,
+    @CurrentMerchant() merchant: AuthenticatedMerchant,
   ): Promise<GetTransactionOutput> {
-    return this.getTransactionUseCase.execute(params);
+    return this.getTransactionUseCase.execute(params, merchant.id);
   }
 }

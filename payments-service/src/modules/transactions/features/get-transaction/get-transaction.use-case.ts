@@ -9,11 +9,14 @@ import {
 export class GetTransactionUseCase {
   constructor(private readonly prisma: PrismaService) {}
 
-  async execute(input: GetTransactionInput): Promise<GetTransactionOutput> {
+  async execute(
+    input: GetTransactionInput,
+    merchantId: string,
+  ): Promise<GetTransactionOutput> {
     const id = input.id.trim();
 
-    const transaction = await this.prisma.transaction.findUnique({
-      where: { id },
+    const transaction = await this.prisma.transaction.findFirst({
+      where: { id, merchant_id: merchantId },
       select: {
         id: true,
         merchant_id: true,
