@@ -8,7 +8,26 @@ import {
   IsString,
   IsUUID,
   Matches,
+  Validate,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
+
+@ValidatorConstraint({ name: 'amountGreaterThanZero', async: false })
+class AmountGreaterThanZeroConstraint implements ValidatorConstraintInterface {
+  validate(value: string): boolean {
+    if (typeof value !== 'string') return false;
+    const trimmed = value.trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return false;
+    const numeric = Number(trimmed);
+    return Number.isFinite(numeric) && numeric > 0;
+  }
+
+  defaultMessage(args: ValidationArguments): string {
+    return `${args.property} must be greater than 0`;
+  }
+}
 
 export class CreateTransactionInput {
   @ApiProperty({ format: 'uuid' })
@@ -19,6 +38,7 @@ export class CreateTransactionInput {
   @ApiProperty({ example: '125.50' })
   @IsString()
   @Matches(/^\d+(\.\d{1,2})?$/)
+  @Validate(AmountGreaterThanZeroConstraint)
   readonly amount!: string;
 
   @ApiProperty({ enum: Currency })
@@ -28,10 +48,6 @@ export class CreateTransactionInput {
   @ApiProperty({ enum: TransactionType })
   @IsEnum(TransactionType)
   readonly type!: TransactionType;
-
-  @ApiProperty({ example: 'ref-001' })
-  @IsString()
-  readonly reference!: string;
 
   @ApiPropertyOptional({ type: Object })
   @IsOptional()
