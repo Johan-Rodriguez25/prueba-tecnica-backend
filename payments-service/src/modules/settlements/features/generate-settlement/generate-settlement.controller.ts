@@ -1,10 +1,24 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBody,
   ApiCreatedResponse,
   ApiOperation,
+  ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  ApiKeyAuthGuard,
+  type AuthenticatedMerchant,
+} from '@/auth/api-key-auth.guard';
+import { CurrentMerchant } from '@/auth/current-merchant.decorator';
 import {
   GenerateSettlementInput,
   GenerateSettlementOutput,
@@ -12,7 +26,9 @@ import {
 import { GenerateSettlementUseCase } from './generate-settlement.use-case';
 
 @ApiTags('settlements')
+@ApiSecurity('api-key')
 @Controller({ path: 'settlements', version: '1' })
+@UseGuards(ApiKeyAuthGuard)
 export class GenerateSettlementController {
   constructor(
     private readonly generateSettlementUseCase: GenerateSettlementUseCase,
@@ -25,7 +41,13 @@ export class GenerateSettlementController {
   @ApiCreatedResponse({ type: GenerateSettlementOutput })
   async generate(
     @Body() body: GenerateSettlementInput,
+    @CurrentMerchant() merchant: AuthenticatedMerchant,
   ): Promise<GenerateSettlementOutput> {
+    if (body.merchant_id !== merchant.id) {
+      throw new ForbiddenException(
+        'merchant_id does not match api key merchant',
+      );
+    }
     return this.generateSettlementUseCase.execute(body);
   }
 }
