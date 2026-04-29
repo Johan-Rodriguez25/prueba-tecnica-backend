@@ -23,7 +23,6 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Payments Service')
     .setVersion('1.0')
-    .addServer('/api/v1')
     .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
