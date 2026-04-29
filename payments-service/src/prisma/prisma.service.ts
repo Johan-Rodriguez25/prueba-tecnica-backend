@@ -8,6 +8,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   constructor() {
     // 1. Tomamos la URL del entorno
     const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error('DATABASE_URL is required');
+    }
 
     // 2. Creamos el pool de conexiones usando la librería 'pg'
     const pool = new Pool({ connectionString });
