@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =======================
+// ENUMS
+// =======================
+
+enum MerchantStatus {
+  active
+  inactive
+}
+
+enum Currency {
+  GTQ
+  COP
+  USD
+}
+
+enum TransactionType {
+  payin
+  payout
+}
+
+enum TransactionStatus {
+  pending
+  approved
+  rejected
+  failed
+  completed
+}
+
+enum SettlementStatus {
+  pending
+  processed
+  paid
+}
+
+// =======================
+// MODELOS
+// =======================
+
+model Merchant {
+  id         String         @id @default(uuid()) @db.Uuid
+  name       String
+  email      String         @unique
+  api_key    String         @unique
+  status     MerchantStatus @default(active)
+  created_at DateTime       @default(now())
+  updated_at DateTime       @updatedAt
+
+  // Relaciones
+  transactions Transaction[]
+  settlements  Settlement[]
+
+  // Índices
+  @@index([status])
+}
+
+model Transaction {
+  id          String            @id @default(uuid()) @db.Uuid
+  merchant_id String            @db.Uuid
+  amount      Decimal           @db.Decimal(12, 2)
+  currency    Currency
+  type        TransactionType
+  status      TransactionStatus
+  reference   String            @unique
+  metadata    Json?             // Opcional
+  created_at  DateTime          @default(now())
+  updated_at  DateTime          @updatedAt
+
+  // Relaciones
+  merchant              Merchant               @relation(fields: [merchant_id], references: [id], onDelete: Restrict)
+  settlement_transaction SettlementTransaction?
+
+  // Índices para búsquedas frecuentes
+  @@index([merchant_id])
+  @@index([status])
+  @@index([created_at])
+  // Índice compuesto para dashboards o reportes filtrados por merchant y fecha
+  @@index([merchant_id, status, created_at])
+}
+
+model Settlement {
+  id                String           @id @default(uuid()) @db.Uuid
+  merchant_id       String           @db.Uuid
+  total_amount      Decimal          @db.Decimal(14, 2)
+  transaction_count Int
+  status            SettlementStatus
+  period_start      DateTime
+  period_end        DateTime
+  created_at        DateTime         @default(now())
+
+  // Relaciones
+  merchant     Merchant                @relation(fields: [merchant_id], references: [id], onDelete: Restrict)
+  transactions SettlementTransaction[]
+
+  // Índices
+  @@index([merchant_id])
+  @@index([status])
+  @@index([period_start, period_end])
+}
+
+// Tabla Pivot
+model SettlementTransaction {
+  settlement_id  String @db.Uuid
+  transaction_id String @unique @db.Uuid // Garantiza que una transacción solo tenga una liquidación
+
+  // Relaciones
+  settlement  Settlement  @relation(fields: [settlement_id], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transaction_id], references: [id], onDelete: Restrict)
+
+  // Llave primaria compuesta
+  @@id([settlement_id, transaction_id])
+  @@index([settlement_id])
+}
