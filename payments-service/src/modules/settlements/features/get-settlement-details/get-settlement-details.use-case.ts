@@ -11,11 +11,12 @@ export class GetSettlementDetailsUseCase {
 
   async execute(
     params: GetSettlementDetailsParams,
+    merchantId: string,
   ): Promise<GetSettlementDetailsOutput> {
     const id = params.id.trim();
 
-    const settlement = await this.prisma.settlement.findUnique({
-      where: { id },
+    const settlement = await this.prisma.settlement.findFirst({
+      where: { id, merchant_id: merchantId },
       select: {
         id: true,
         merchant_id: true,
