@@ -1,0 +1,41 @@
+{
+  "name": "api-gateway",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./dist/app.js",
+  "scripts": {
+    "lint": "eslint --ext .ts src/**",
+    "build": "tsc",
+    "build:docker": "docker build -t prueba_atomo_gaming .",
+    "start": "cross-env NODE_ENV=production tsc-watch --project . --outDir ./dist --onSuccess \"node ./dist/app.js\"",
+    "stage": "cross-env NODE_ENV=development tsc-watch --project . --outDir ./dist --onSuccess \"node ./dist/app.js\"",
+    "prod": "cross-env NODE_ENV=production tsc-watch --project . --outDir ./dist --onSuccess \"nodemon ./dist/app.js\"",
+    "dev": "cross-env NODE_ENV=development tsc-watch --project . --outDir ./dist --onSuccess \"nodemon ./dist/app.js\"",
+    "local": "cross-env NODE_ENV=local tsc-watch --project . --outDir ./dist --onSuccess \"nodemon ./dist/app.js\""
+  },
+  "keywords": [],
+  "author": "Johan Rodriguez",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20.18.0"
+  },
+  "dependencies": {
+    "compression": "^1.8.1",
+    "cors": "^2.8.6",
+    "dotenv-flow": "^4.1.0",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/compression": "^1.8.1",
+    "@types/cors": "^2.8.19",
+    "@types/dotenv-flow": "^3.3.3",
+    "@types/express": "^5.0.6",
+    "@types/morgan": "^1.9.10",
+    "eslint-plugin-prettier": "^5.5.5",
+    "globals": "^17.5.0",
+    "typescript-eslint": "^8.59.1"
+  }
+}
