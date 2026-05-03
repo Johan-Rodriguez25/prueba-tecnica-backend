@@ -59,7 +59,7 @@ export class GetTransactionsUseCase {
 
   constructor(args?: { paymentServiceBaseUrl?: string; timeoutMs?: number }) {
     this.paymentServiceBaseUrl =
-      args?.paymentServiceBaseUrl ?? process.env.PAYMENT_SERVICE_URL ?? "http://localhost:3001";
+      args?.paymentServiceBaseUrl ?? process.env.PAYMENT_SERVICE_URL ?? "http://localhost:3000";
     this.timeoutMs = args?.timeoutMs ?? Number(process.env.PAYMENT_SERVICE_TIMEOUT_MS ?? 8000);
   }
 
