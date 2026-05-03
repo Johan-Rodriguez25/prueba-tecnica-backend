@@ -11,6 +11,7 @@ export class GetTransactionController {
       const result = await this.getTransactionUseCase.execute({
         id: params.id,
         headers: req.headers,
+        auth: req.auth,
       });
 
       if (result.contentType) {

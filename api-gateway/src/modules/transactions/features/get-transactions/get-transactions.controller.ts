@@ -9,6 +9,7 @@ export class GetTransactionsController {
       const result = await this.getTransactionsUseCase.execute({
         query: req.query as unknown as Record<string, unknown>,
         headers: req.headers,
+        auth: req.auth,
       });
 
       if (result.contentType) {

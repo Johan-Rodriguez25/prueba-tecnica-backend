@@ -12,6 +12,7 @@ export class CreateTransactionController {
       const result = await this.createTransactionUseCase.execute({
         body: req.body as CreateTransactionInput,
         headers: req.headers,
+        auth: req.auth,
       });
 
       if (result.contentType) {

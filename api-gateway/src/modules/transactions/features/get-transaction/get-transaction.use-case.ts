@@ -1,5 +1,6 @@
 import type { IncomingHttpHeaders } from 'http';
 import type { GetTransactionOutput } from './get-transaction.dto';
+import type { AuthContext } from '../../../main/middlewares/dual-auth.middleware';
 
 type ProxyResult<T> = {
   status: number;
@@ -19,11 +20,19 @@ function getHeaderValue(
 
 function pickForwardHeaders(
   headers: IncomingHttpHeaders,
+  auth?: AuthContext,
 ): Record<string, string> {
   const forwarded: Record<string, string> = {};
 
   const apiKey = getHeaderValue(headers, 'x-api-key');
+  const authApiKey =
+    auth?.type === 'apiKey'
+      ? auth.apiKey
+      : auth?.type === 'jwt'
+        ? auth.apiKey
+        : undefined;
   if (apiKey) forwarded['x-api-key'] = apiKey;
+  else if (authApiKey) forwarded['x-api-key'] = authApiKey;
 
   const authorization = getHeaderValue(headers, 'authorization');
   if (authorization) forwarded['authorization'] = authorization;
@@ -57,6 +66,7 @@ export class GetTransactionUseCase {
   async execute(args: {
     id: string;
     headers: IncomingHttpHeaders;
+    auth?: AuthContext;
   }): Promise<ProxyResult<GetTransactionOutput>> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -65,7 +75,7 @@ export class GetTransactionUseCase {
         `${this.paymentServiceBaseUrl}/api/v1/transactions/${args.id}`,
         {
           method: 'GET',
-          headers: pickForwardHeaders(args.headers),
+          headers: pickForwardHeaders(args.headers, args.auth),
           signal: controller.signal,
         },
       );
