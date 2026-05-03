@@ -5,6 +5,8 @@ import cors from "cors";
 import dotenvFlow from "dotenv-flow";
 import morgan from "morgan";
 import helmet from "helmet";
+import { createSettlementsRouter } from "../settlements/settlements.module";
+import { createTransactionsRouter } from "../transactions/transactions.module";
 
 dotenvFlow.config({
   silent: true,
@@ -70,6 +72,9 @@ class Server {
     this.app.get("/", (req: any, res: any) =>
       res.status(200).json({ ok: true }),
     );
+
+    this.app.use("/api/v1/transactions", createTransactionsRouter());
+    this.app.use("/api/v1/settlements", createSettlementsRouter());
   }
 
   private listen(): void {
