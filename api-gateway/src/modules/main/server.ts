@@ -9,6 +9,7 @@ import { createTransactionsRouter } from "../transactions/transactions.module";
 import { dualAuthMiddleware } from "./middlewares/dual-auth.middleware";
 import { rateLimitByApiKeyMiddleware } from "./middlewares/rate-limit.middleware";
 import { requestLoggerMiddleware } from "./middlewares/request-logger.middleware";
+import { createSwaggerRouter } from "./swagger/swagger";
 
 dotenvFlow.config({
   silent: true,
@@ -75,6 +76,7 @@ class Server {
       res.status(200).json({ ok: true }),
     );
 
+    this.app.use(createSwaggerRouter());
     this.app.use("/api/v1", dualAuthMiddleware(), rateLimitByApiKeyMiddleware());
     this.app.use("/api/v1/transactions", createTransactionsRouter());
     this.app.use("/api/v1/settlements", createSettlementsRouter());
