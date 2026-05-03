@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import type { RequestHandler } from 'express';
 
 export type AuthContext =
-  | { type: 'jwt'; payload: Record<string, unknown> }
+  | { type: 'jwt'; payload: Record<string, unknown>; apiKey?: string }
   | { type: 'apiKey'; apiKey: string };
 
 declare global {
@@ -65,6 +65,24 @@ function verifyHs256Jwt(
   return payloadRaw;
 }
 
+function extractApiKeyFromJwtPayload(
+  payload: Record<string, unknown>,
+): string | undefined {
+  const candidates = [
+    payload.api_key,
+    payload.apiKey,
+    payload['x-api-key'],
+    payload.x_api_key,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+  return undefined;
+}
+
 export function dualAuthMiddleware(): RequestHandler {
   const secret = 'PRUEBA_TECNICA_SECRET_KEY';
 
@@ -77,7 +95,7 @@ export function dualAuthMiddleware(): RequestHandler {
         res.status(401).json({ message: 'invalid token' });
         return;
       }
-      req.auth = { type: 'jwt', payload };
+      req.auth = { type: 'jwt', payload, apiKey: extractApiKeyFromJwtPayload(payload) };
       next();
       return;
     }
