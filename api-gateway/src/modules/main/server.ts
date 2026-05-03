@@ -3,10 +3,12 @@ import express, { Application } from "express";
 import compression from "compression";
 import cors from "cors";
 import dotenvFlow from "dotenv-flow";
-import morgan from "morgan";
 import helmet from "helmet";
 import { createSettlementsRouter } from "../settlements/settlements.module";
 import { createTransactionsRouter } from "../transactions/transactions.module";
+import { dualAuthMiddleware } from "./middlewares/dual-auth.middleware";
+import { rateLimitByApiKeyMiddleware } from "./middlewares/rate-limit.middleware";
+import { requestLoggerMiddleware } from "./middlewares/request-logger.middleware";
 
 dotenvFlow.config({
   silent: true,
@@ -54,6 +56,7 @@ class Server {
   }
 
   private middlewares(): void {
+    this.app.use(requestLoggerMiddleware());
     this.app.use(cors());
     this.app.use(
       express.urlencoded({
@@ -63,7 +66,6 @@ class Server {
       }),
     );
     this.app.use(express.json({ limit: "6mb" }));
-    this.app.use(morgan("dev"));
     this.app.use(helmet());
     this.app.use(compression({ level: 9 }));
   }
@@ -73,6 +75,7 @@ class Server {
       res.status(200).json({ ok: true }),
     );
 
+    this.app.use("/api/v1", dualAuthMiddleware(), rateLimitByApiKeyMiddleware());
     this.app.use("/api/v1/transactions", createTransactionsRouter());
     this.app.use("/api/v1/settlements", createSettlementsRouter());
   }
