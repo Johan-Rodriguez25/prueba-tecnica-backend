@@ -1,5 +1,6 @@
 import type { IncomingHttpHeaders } from "http";
 import type { GenerateSettlementInput, GenerateSettlementOutput } from "./generate-settlement.dto";
+import type { AuthContext } from "../../../main/middlewares/dual-auth.middleware";
 
 type ProxyResult<T> = {
   status: number;
@@ -14,11 +15,16 @@ function getHeaderValue(headers: IncomingHttpHeaders, name: string): string | un
   return undefined;
 }
 
-function pickForwardHeaders(headers: IncomingHttpHeaders): Record<string, string> {
+function pickForwardHeaders(
+  headers: IncomingHttpHeaders,
+  auth?: AuthContext,
+): Record<string, string> {
   const forwarded: Record<string, string> = {};
 
   const apiKey = getHeaderValue(headers, "x-api-key");
+  const authApiKey = auth?.type === "apiKey" ? auth.apiKey : auth?.type === "jwt" ? auth.apiKey : undefined;
   if (apiKey) forwarded["x-api-key"] = apiKey;
+  else if (authApiKey) forwarded["x-api-key"] = authApiKey;
 
   const authorization = getHeaderValue(headers, "authorization");
   if (authorization) forwarded["authorization"] = authorization;
@@ -52,13 +58,14 @@ export class GenerateSettlementUseCase {
   async execute(args: {
     body: GenerateSettlementInput;
     headers: IncomingHttpHeaders;
+    auth?: AuthContext;
   }): Promise<ProxyResult<GenerateSettlementOutput>> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const response = await fetch(`${this.paymentServiceBaseUrl}/api/v1/settlements/generate`, {
         method: "POST",
-        headers: pickForwardHeaders(args.headers),
+        headers: pickForwardHeaders(args.headers, args.auth),
         body: JSON.stringify(args.body),
         signal: controller.signal,
       });

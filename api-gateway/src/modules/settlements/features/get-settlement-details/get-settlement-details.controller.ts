@@ -11,6 +11,7 @@ export class GetSettlementDetailsController {
       const result = await this.getSettlementDetailsUseCase.execute({
         id: params.id,
         headers: req.headers,
+        auth: req.auth,
       });
 
       if (result.contentType) {
@@ -31,4 +32,3 @@ export class GetSettlementDetailsController {
     }
   }
 }
-

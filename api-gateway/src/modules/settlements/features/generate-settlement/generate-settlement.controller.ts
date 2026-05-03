@@ -10,6 +10,7 @@ export class GenerateSettlementController {
       const result = await this.generateSettlementUseCase.execute({
         body: req.body as GenerateSettlementInput,
         headers: req.headers,
+        auth: req.auth,
       });
 
       if (result.contentType) {
@@ -30,4 +31,3 @@ export class GenerateSettlementController {
     }
   }
 }
-

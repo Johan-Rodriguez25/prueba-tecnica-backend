@@ -1,5 +1,6 @@
-import type { IncomingHttpHeaders } from "http";
-import type { GetSettlementDetailsOutput } from "./get-settlement-details.dto";
+import type { IncomingHttpHeaders } from 'http';
+import type { GetSettlementDetailsOutput } from './get-settlement-details.dto';
+import type { AuthContext } from '../../../main/middlewares/dual-auth.middleware';
 
 type ProxyResult<T> = {
   status: number;
@@ -7,28 +8,43 @@ type ProxyResult<T> = {
   data: T | string;
 };
 
-function getHeaderValue(headers: IncomingHttpHeaders, name: string): string | undefined {
+function getHeaderValue(
+  headers: IncomingHttpHeaders,
+  name: string,
+): string | undefined {
   const value = headers[name.toLowerCase()];
-  if (typeof value === "string") return value;
+  if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value[0];
   return undefined;
 }
 
-function pickForwardHeaders(headers: IncomingHttpHeaders): Record<string, string> {
+function pickForwardHeaders(
+  headers: IncomingHttpHeaders,
+  auth?: AuthContext,
+): Record<string, string> {
   const forwarded: Record<string, string> = {};
 
-  const apiKey = getHeaderValue(headers, "x-api-key");
-  if (apiKey) forwarded["x-api-key"] = apiKey;
+  const apiKey = getHeaderValue(headers, 'x-api-key');
+  const authApiKey =
+    auth?.type === 'apiKey'
+      ? auth.apiKey
+      : auth?.type === 'jwt'
+        ? auth.apiKey
+        : undefined;
+  if (apiKey) forwarded['x-api-key'] = apiKey;
+  else if (authApiKey) forwarded['x-api-key'] = authApiKey;
 
-  const authorization = getHeaderValue(headers, "authorization");
-  if (authorization) forwarded["authorization"] = authorization;
+  const authorization = getHeaderValue(headers, 'authorization');
+  if (authorization) forwarded['authorization'] = authorization;
 
   return forwarded;
 }
 
-async function readResponseBody(response: Response): Promise<{ contentType: string | null; data: unknown | string }> {
-  const contentType = response.headers.get("content-type");
-  if (contentType?.includes("application/json")) {
+async function readResponseBody(
+  response: Response,
+): Promise<{ contentType: string | null; data: unknown | string }> {
+  const contentType = response.headers.get('content-type');
+  if (contentType?.includes('application/json')) {
     return { contentType, data: (await response.json()) as unknown };
   }
   return { contentType, data: await response.text() };
@@ -40,25 +56,36 @@ export class GetSettlementDetailsUseCase {
 
   constructor(args?: { paymentServiceBaseUrl?: string; timeoutMs?: number }) {
     this.paymentServiceBaseUrl =
-      args?.paymentServiceBaseUrl ?? process.env.PAYMENT_SERVICE_URL ?? "http://localhost:3000";
-    this.timeoutMs = args?.timeoutMs ?? Number(process.env.PAYMENT_SERVICE_TIMEOUT_MS ?? 8000);
+      args?.paymentServiceBaseUrl ??
+      process.env.PAYMENT_SERVICE_URL ??
+      'http://localhost:3000';
+    this.timeoutMs =
+      args?.timeoutMs ?? Number(process.env.PAYMENT_SERVICE_TIMEOUT_MS ?? 8000);
   }
 
   async execute(args: {
     id: string;
     headers: IncomingHttpHeaders;
+    auth?: AuthContext;
   }): Promise<ProxyResult<GetSettlementDetailsOutput>> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const response = await fetch(`${this.paymentServiceBaseUrl}/api/v1/settlements/${args.id}`, {
-        method: "GET",
-        headers: pickForwardHeaders(args.headers),
-        signal: controller.signal,
-      });
+      const response = await fetch(
+        `${this.paymentServiceBaseUrl}/api/v1/settlements/${args.id}`,
+        {
+          method: 'GET',
+          headers: pickForwardHeaders(args.headers, args.auth),
+          signal: controller.signal,
+        },
+      );
 
       const { contentType, data } = await readResponseBody(response);
-      return { status: response.status, contentType, data: data as GetSettlementDetailsOutput };
+      return {
+        status: response.status,
+        contentType,
+        data: data as GetSettlementDetailsOutput,
+      };
     } finally {
       clearTimeout(timeout);
     }
