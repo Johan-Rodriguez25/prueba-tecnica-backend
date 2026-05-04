@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, SettlementStatus, TransactionStatus } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
   GenerateSettlementInput,
@@ -102,23 +103,33 @@ export class GenerateSettlementUseCase {
         new Prisma.Decimal(0),
       );
 
-      const settlement = await this.prisma.settlement.create({
-        data: {
-          merchant_id: merchantId,
-          total_amount: totalAmount,
-          transaction_count: eligible.length,
-          status: SettlementStatus.pending,
-          period_start: periodStart,
-          period_end: periodEnd,
-          transactions: {
-            createMany: {
-              data: transactionIds.map((transactionId) => ({
-                transaction_id: transactionId,
-              })),
+      const settlementId = randomUUID();
+
+      const [settlement] = await this.prisma.$transaction(
+        [
+          this.prisma.settlement.create({
+            data: {
+              id: settlementId,
+              merchant_id: merchantId,
+              total_amount: totalAmount,
+              transaction_count: eligible.length,
+              status: SettlementStatus.pending,
+              period_start: periodStart,
+              period_end: periodEnd,
             },
-          },
+          }),
+          this.prisma.settlementTransaction.createMany({
+            data: transactionIds.map((transactionId) => ({
+              settlement_id: settlementId,
+              transaction_id: transactionId,
+            })),
+          }),
+        ],
+        {
+          maxWait: 20_000,
+          timeout: 120_000,
         },
-      });
+      );
 
       return GenerateSettlementOutput.fromPrisma({
         settlement,
