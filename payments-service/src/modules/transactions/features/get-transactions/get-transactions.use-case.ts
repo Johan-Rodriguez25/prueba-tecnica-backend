@@ -42,26 +42,24 @@ export class GetTransactionsUseCase {
       throw new BadRequestException('date_from cannot be greater than date_to');
     }
 
-    const [total, transactions] = await this.prisma.$transaction([
-      this.prisma.transaction.count({ where }),
-      this.prisma.transaction.findMany({
-        where,
-        orderBy: { created_at: 'desc' },
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          merchant_id: true,
-          amount: true,
-          currency: true,
-          type: true,
-          status: true,
-          reference: true,
-          metadata: true,
-          created_at: true,
-        },
-      }),
-    ]);
+    const total = await this.prisma.transaction.count({ where });
+    const transactions = await this.prisma.transaction.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        merchant_id: true,
+        amount: true,
+        currency: true,
+        type: true,
+        status: true,
+        reference: true,
+        metadata: true,
+        created_at: true,
+      },
+    });
 
     const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
