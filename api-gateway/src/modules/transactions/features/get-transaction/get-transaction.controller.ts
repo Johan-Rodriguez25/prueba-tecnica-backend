@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import type { GetTransactionParams } from './get-transaction.dto';
 import { GetTransactionUseCase } from './get-transaction.use-case';
+import { CircuitBreakerOpenError } from '../../../main/resilience/circuit-breaker';
 
 export class GetTransactionController {
   constructor(private readonly getTransactionUseCase: GetTransactionUseCase) {}
@@ -25,6 +26,10 @@ export class GetTransactionController {
 
       res.status(result.status).json(result.data);
     } catch (error) {
+      if (error instanceof CircuitBreakerOpenError) {
+        res.status(503).json({ message: 'payment-service unavailable' });
+        return;
+      }
       const isAbortError =
         error instanceof Error && error.name === 'AbortError';
       res.status(isAbortError ? 504 : 502).json({
