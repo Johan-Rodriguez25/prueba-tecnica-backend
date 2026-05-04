@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '@/notifications/notifications.module';
 import { CreateTransactionController } from './features/create-transaction/create-transaction.controller';
 import { CreateTransactionUseCase } from './features/create-transaction/create-transaction.use-case';
 import { GetTransactionController } from './features/get-transaction/get-transaction.controller';
@@ -9,7 +10,7 @@ import { UpdateTransactionStatusController } from './features/update-transaction
 import { UpdateTransactionStatusUseCase } from './features/update-transaction-status/update-transaction-status.use-case';
 
 @Module({
-  imports: [],
+  imports: [NotificationsModule],
   controllers: [
     CreateTransactionController,
     GetTransactionsController,
