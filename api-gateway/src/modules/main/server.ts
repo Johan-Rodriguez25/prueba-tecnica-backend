@@ -12,6 +12,10 @@ import { dualAuthMiddleware } from './middlewares/dual-auth.middleware';
 import { rateLimitByApiKeyMiddleware } from './middlewares/rate-limit.middleware';
 import { requestLoggerMiddleware } from './middlewares/request-logger.middleware';
 import { createSwaggerRouter } from './swagger/swagger';
+import {
+  CircuitBreakerOpenError,
+  getCircuitBreaker,
+} from './resilience/circuit-breaker';
 
 dotenvFlow.config({
   silent: true,
@@ -73,6 +77,9 @@ async function readResponseBody(
 function createNotificationsProxyRouter(): express.Router {
   const router = express.Router();
 
+  const notificationServiceCircuitBreaker = getCircuitBreaker(
+    'notification-service',
+  );
   const notificationServiceBaseUrl =
     process.env.NOTIFICATION_SERVICE_URL ?? 'http://localhost:3002';
   const timeoutMs = Number(process.env.NOTIFICATION_SERVICE_TIMEOUT_MS ?? 8000);
@@ -81,22 +88,35 @@ function createNotificationsProxyRouter(): express.Router {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const url = new URL(
-        `/api/v1/notifications${req.path === '/' ? '' : req.path}`,
-        notificationServiceBaseUrl,
+      const result = await notificationServiceCircuitBreaker.execute(
+        async () => {
+          const url = new URL(
+            `/api/v1/notifications${req.path === '/' ? '' : req.path}`,
+            notificationServiceBaseUrl,
+          );
+          appendQueryParams(url, req.query as Record<string, unknown>);
+
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: pickForwardHeaders(req.headers),
+            signal: controller.signal,
+          });
+
+          const { contentType, data } = await readResponseBody(response);
+          return { status: response.status, contentType, data };
+        },
+        {
+          isFailure: (value) => value.status >= 500,
+        },
       );
-      appendQueryParams(url, req.query as Record<string, unknown>);
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: pickForwardHeaders(req.headers),
-        signal: controller.signal,
-      });
-
-      const { contentType, data } = await readResponseBody(response);
-      if (contentType) res.setHeader('content-type', contentType);
-      res.status(response.status).send(data);
-    } catch {
+      if (result.contentType) res.setHeader('content-type', result.contentType);
+      res.status(result.status).send(result.data);
+    } catch (error) {
+      if (error instanceof CircuitBreakerOpenError) {
+        res.status(503).json({ message: 'notification-service unavailable' });
+        return;
+      }
       res.status(502).json({ message: 'notification-service unavailable' });
     } finally {
       clearTimeout(timeout);
