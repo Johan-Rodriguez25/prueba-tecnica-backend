@@ -19,6 +19,7 @@ export function createOpenApiDocument(args: {
       { name: 'transactions' },
       { name: 'settlements' },
       { name: 'notifications' },
+      { name: 'health' },
     ],
     components: {
       securitySchemes: {
@@ -238,10 +239,55 @@ export function createOpenApiDocument(args: {
             message: { type: 'string' },
           },
         },
+        ServiceHealthResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            service: { type: 'string' },
+            uptime: { type: 'integer' },
+            database: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+          },
+        },
+        GatewayHealthResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            service: { type: 'string' },
+            uptime: { type: 'integer' },
+            timestamp: { type: 'string', format: 'date-time' },
+            services: { type: 'object', additionalProperties: true },
+          },
+        },
       },
     },
     security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
     paths: {
+      '/api/v1/health': {
+        get: {
+          tags: ['health'],
+          summary: 'Aggregated health (gateway + services)',
+          security: [],
+          responses: {
+            '200': {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/GatewayHealthResponse' },
+                },
+              },
+            },
+            '503': {
+              description: 'Service Unavailable',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/GatewayHealthResponse' },
+                },
+              },
+            },
+          },
+        },
+      },
       '/api/v1/transactions': {
         get: {
           tags: ['transactions'],

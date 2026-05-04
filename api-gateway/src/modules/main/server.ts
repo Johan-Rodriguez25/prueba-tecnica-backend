@@ -74,6 +74,22 @@ async function readResponseBody(
   return { contentType, data: await response.text() };
 }
 
+async function fetchHealth(baseUrl: string, timeoutMs: number): Promise<unknown> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const url = new URL('/health', baseUrl);
+    const response = await fetch(url, { method: 'GET', signal: controller.signal });
+    const body = (await response.json()) as unknown;
+    if (!response.ok) {
+      throw new Error('health check failed');
+    }
+    return body;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function createNotificationsProxyRouter(): express.Router {
   const router = express.Router();
 
@@ -188,6 +204,41 @@ class Server {
     this.app.get('/', (req: any, res: any) =>
       res.status(200).json({ ok: true }),
     );
+
+    this.app.get('/api/v1/health', async (req, res) => {
+      const paymentServiceBaseUrl =
+        process.env.PAYMENT_SERVICE_URL ?? 'http://localhost:3000';
+      const notificationServiceBaseUrl =
+        process.env.NOTIFICATION_SERVICE_URL ?? 'http://localhost:3002';
+      const timeoutMs = Number(process.env.HEALTHCHECK_TIMEOUT_MS ?? 2000);
+
+      const [payment, notification] = await Promise.allSettled([
+        fetchHealth(paymentServiceBaseUrl, timeoutMs),
+        fetchHealth(notificationServiceBaseUrl, timeoutMs),
+      ]);
+
+      const services: Record<string, unknown> = {
+        'payment-service':
+          payment.status === 'fulfilled'
+            ? payment.value
+            : { status: 'error', service: 'payment-service' },
+        'notification-service':
+          notification.status === 'fulfilled'
+            ? notification.value
+            : { status: 'error', service: 'notification-service' },
+      };
+
+      const allOk =
+        payment.status === 'fulfilled' && notification.status === 'fulfilled';
+
+      res.status(allOk ? 200 : 503).json({
+        status: allOk ? 'ok' : 'degraded',
+        service: 'api-gateway',
+        uptime: Math.floor(process.uptime()),
+        timestamp: new Date().toISOString(),
+        services,
+      });
+    });
 
     this.app.get('/docs', (req, res) => res.redirect(301, '/api/docs'));
     this.app.get('/openapi.json', (req, res) =>
