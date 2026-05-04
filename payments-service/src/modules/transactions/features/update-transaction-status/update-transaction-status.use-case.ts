@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { TransactionStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { NotificationsEventsPublisher } from '@/notifications/notifications-events.publisher';
 import {
   UpdateTransactionStatusBody,
   UpdateTransactionStatusOutput,
@@ -13,7 +14,10 @@ import {
 
 @Injectable()
 export class UpdateTransactionStatusUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsEvents: NotificationsEventsPublisher,
+  ) {}
 
   async execute(
     params: UpdateTransactionStatusParams,
@@ -84,6 +88,34 @@ export class UpdateTransactionStatusUseCase {
       },
     });
 
+    const metadata =
+      typeof updated.metadata === 'object' &&
+      updated.metadata !== null &&
+      !Array.isArray(updated.metadata)
+        ? (updated.metadata as Record<string, unknown>)
+        : undefined;
+
+    await this.notificationsEvents.transactionStatusChanged({
+      transactionId: updated.id,
+      merchantId: updated.merchant_id,
+      reference: updated.reference,
+      previousStatus: currentStatus,
+      currentStatus: updated.status,
+      occurredAt: new Date().toISOString(),
+      payload: {
+        id: updated.id,
+        merchantId: updated.merchant_id,
+        amount: updated.amount.toString(),
+        currency: updated.currency,
+        type: updated.type,
+        status: updated.status,
+        reference: updated.reference,
+        metadata,
+        createdAt: updated.created_at.toISOString(),
+        updatedAt: updated.updated_at.toISOString(),
+      },
+    });
+
     return {
       id: updated.id,
       merchantId: updated.merchant_id,
@@ -92,8 +124,7 @@ export class UpdateTransactionStatusUseCase {
       type: updated.type,
       status: updated.status,
       reference: updated.reference,
-      metadata:
-        (updated.metadata as Record<string, unknown> | null) ?? undefined,
+      metadata,
       createdAt: updated.created_at,
       updatedAt: updated.updated_at,
     };
