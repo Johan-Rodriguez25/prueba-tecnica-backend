@@ -4,6 +4,7 @@ import type {
   UpdateTransactionStatusParams,
 } from './update-transaction-status.dto';
 import { UpdateTransactionStatusUseCase } from './update-transaction-status.use-case';
+import { CircuitBreakerOpenError } from '../../../main/resilience/circuit-breaker';
 
 export class UpdateTransactionStatusController {
   constructor(
@@ -31,6 +32,10 @@ export class UpdateTransactionStatusController {
 
       res.status(result.status).json(result.data);
     } catch (error) {
+      if (error instanceof CircuitBreakerOpenError) {
+        res.status(503).json({ message: 'payment-service unavailable' });
+        return;
+      }
       const isAbortError =
         error instanceof Error && error.name === 'AbortError';
       res.status(isAbortError ? 504 : 502).json({

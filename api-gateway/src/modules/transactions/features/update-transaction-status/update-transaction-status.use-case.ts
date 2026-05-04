@@ -4,12 +4,15 @@ import type {
   UpdateTransactionStatusOutput,
 } from './update-transaction-status.dto';
 import type { AuthContext } from '../../../main/middlewares/dual-auth.middleware';
+import { getCircuitBreaker } from '../../../main/resilience/circuit-breaker';
 
 type ProxyResult<T> = {
   status: number;
   contentType: string | null;
   data: T | string;
 };
+
+const paymentServiceCircuitBreaker = getCircuitBreaker('payment-service');
 
 function getHeaderValue(
   headers: IncomingHttpHeaders,
@@ -81,22 +84,29 @@ export class UpdateTransactionStatusUseCase {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const response = await fetch(
-        `${this.paymentServiceBaseUrl}/api/v1/transactions/${args.id}/status`,
+      return await paymentServiceCircuitBreaker.execute(
+        async () => {
+          const response = await fetch(
+            `${this.paymentServiceBaseUrl}/api/v1/transactions/${args.id}/status`,
+            {
+              method: 'PATCH',
+              headers: pickForwardHeaders(args.headers, args.auth),
+              body: JSON.stringify(args.body),
+              signal: controller.signal,
+            },
+          );
+
+          const { contentType, data } = await readResponseBody(response);
+          return {
+            status: response.status,
+            contentType,
+            data: data as UpdateTransactionStatusOutput,
+          };
+        },
         {
-          method: 'PATCH',
-          headers: pickForwardHeaders(args.headers, args.auth),
-          body: JSON.stringify(args.body),
-          signal: controller.signal,
+          isFailure: (result) => result.status >= 500,
         },
       );
-
-      const { contentType, data } = await readResponseBody(response);
-      return {
-        status: response.status,
-        contentType,
-        data: data as UpdateTransactionStatusOutput,
-      };
     } finally {
       clearTimeout(timeout);
     }
