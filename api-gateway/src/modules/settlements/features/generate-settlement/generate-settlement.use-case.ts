@@ -4,12 +4,15 @@ import type {
   GenerateSettlementOutput,
 } from './generate-settlement.dto';
 import type { AuthContext } from '../../../main/middlewares/dual-auth.middleware';
+import { getCircuitBreaker } from '../../../main/resilience/circuit-breaker';
 
 type ProxyResult<T> = {
   status: number;
   contentType: string | null;
   data: T | string;
 };
+
+const paymentServiceCircuitBreaker = getCircuitBreaker('payment-service');
 
 function getHeaderValue(
   headers: IncomingHttpHeaders,
@@ -90,22 +93,29 @@ export class GenerateSettlementUseCase {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const response = await fetch(
-        `${this.paymentServiceBaseUrl}/api/v1/settlements/generate`,
+      return await paymentServiceCircuitBreaker.execute(
+        async () => {
+          const response = await fetch(
+            `${this.paymentServiceBaseUrl}/api/v1/settlements/generate`,
+            {
+              method: 'POST',
+              headers: pickForwardHeaders(args.headers, args.auth),
+              body: JSON.stringify(args.body),
+              signal: controller.signal,
+            },
+          );
+
+          const { contentType, data } = await readResponseBody(response);
+          return {
+            status: response.status,
+            contentType,
+            data: data as GenerateSettlementOutput,
+          };
+        },
         {
-          method: 'POST',
-          headers: pickForwardHeaders(args.headers, args.auth),
-          body: JSON.stringify(args.body),
-          signal: controller.signal,
+          isFailure: (result) => result.status >= 500,
         },
       );
-
-      const { contentType, data } = await readResponseBody(response);
-      return {
-        status: response.status,
-        contentType,
-        data: data as GenerateSettlementOutput,
-      };
     } finally {
       clearTimeout(timeout);
     }
