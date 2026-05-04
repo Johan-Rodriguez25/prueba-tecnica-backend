@@ -15,6 +15,11 @@ export function createOpenApiDocument(args: {
       version: '1.0.0',
     },
     servers: [{ url: serverUrl }],
+    tags: [
+      { name: 'transactions' },
+      { name: 'settlements' },
+      { name: 'notifications' },
+    ],
     components: {
       securitySchemes: {
         bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
@@ -94,6 +99,53 @@ export function createOpenApiDocument(args: {
         SettlementStatus: {
           type: 'string',
           enum: ['pending', 'processed', 'paid'],
+        },
+        NotificationStatus: {
+          type: 'string',
+          enum: ['pending', 'sent', 'failed'],
+        },
+        NotificationOutput: {
+          type: 'object',
+          required: [
+            'id',
+            'transactionId',
+            'merchantId',
+            'eventType',
+            'payload',
+            'status',
+            'attempts',
+            'createdAt',
+          ],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            transactionId: { type: 'string', format: 'uuid' },
+            merchantId: { type: 'string', format: 'uuid' },
+            eventType: { type: 'string' },
+            payload: { type: 'object', additionalProperties: true },
+            status: { $ref: '#/components/schemas/NotificationStatus' },
+            attempts: { type: 'integer' },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        GetNotificationsOutput: {
+          type: 'object',
+          required: ['data', 'meta'],
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/NotificationOutput' },
+            },
+            meta: {
+              type: 'object',
+              required: ['total', 'page', 'limit', 'total_pages'],
+              properties: {
+                total: { type: 'integer' },
+                page: { type: 'integer' },
+                limit: { type: 'integer' },
+                total_pages: { type: 'integer' },
+              },
+            },
+          },
         },
         GenerateSettlementInput: {
           type: 'object',
@@ -192,6 +244,7 @@ export function createOpenApiDocument(args: {
     paths: {
       '/api/v1/transactions': {
         get: {
+          tags: ['transactions'],
           summary: 'List transactions (proxy to payment-service)',
           parameters: [
             {
@@ -269,6 +322,7 @@ export function createOpenApiDocument(args: {
           },
         },
         post: {
+          tags: ['transactions'],
           summary: 'Create transaction (proxy to payment-service)',
           requestBody: {
             required: true,
@@ -316,6 +370,7 @@ export function createOpenApiDocument(args: {
       },
       '/api/v1/transactions/{id}': {
         get: {
+          tags: ['transactions'],
           summary: 'Get transaction by id (proxy to payment-service)',
           parameters: [
             {
@@ -363,6 +418,7 @@ export function createOpenApiDocument(args: {
       },
       '/api/v1/transactions/{id}/status': {
         patch: {
+          tags: ['transactions'],
           summary: 'Update transaction status (proxy to payment-service)',
           parameters: [
             {
@@ -428,6 +484,7 @@ export function createOpenApiDocument(args: {
       },
       '/api/v1/settlements/generate': {
         post: {
+          tags: ['settlements'],
           summary: 'Generate settlement (proxy to payment-service)',
           requestBody: {
             required: true,
@@ -487,6 +544,7 @@ export function createOpenApiDocument(args: {
       },
       '/api/v1/settlements/{id}': {
         get: {
+          tags: ['settlements'],
           summary: 'Get settlement details (proxy to payment-service)',
           parameters: [
             {
@@ -509,6 +567,124 @@ export function createOpenApiDocument(args: {
             },
             '401': {
               description: 'Unauthorized',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+            '502': {
+              description: 'Bad Gateway',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+            '504': {
+              description: 'Gateway Timeout',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/v1/notifications': {
+        get: {
+          tags: ['notifications'],
+          summary: 'List notifications (proxy to notification-service)',
+          parameters: [
+            {
+              name: 'merchantId',
+              in: 'query',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+            },
+            {
+              name: 'page',
+              in: 'query',
+              required: false,
+              schema: { type: 'integer', minimum: 1 },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              schema: { type: 'integer', minimum: 1, maximum: 100 },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: {
+                    $ref: '#/components/schemas/GetNotificationsOutput',
+                  },
+                },
+              },
+            },
+            '401': {
+              description: 'Unauthorized',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+            '502': {
+              description: 'Bad Gateway',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+            '504': {
+              description: 'Gateway Timeout',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/v1/notifications/{id}': {
+        get: {
+          tags: ['notifications'],
+          summary: 'Get notification by id (proxy to notification-service)',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'OK',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/NotificationOutput' },
+                },
+              },
+            },
+            '401': {
+              description: 'Unauthorized',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+            '404': {
+              description: 'Not Found',
               content: {
                 'application/json': {
                   schema: { $ref: '#/components/schemas/ErrorResponse' },
