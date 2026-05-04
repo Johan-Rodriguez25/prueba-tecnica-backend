@@ -1,12 +1,15 @@
 import type { IncomingHttpHeaders } from 'http';
 import type { GetTransactionsOutput } from './get-transactions.dto';
 import type { AuthContext } from '../../../main/middlewares/dual-auth.middleware';
+import { getCircuitBreaker } from '../../../main/resilience/circuit-breaker';
 
 type ProxyResult<T> = {
   status: number;
   contentType: string | null;
   data: T | string;
 };
+
+const paymentServiceCircuitBreaker = getCircuitBreaker('payment-service');
 
 function getHeaderValue(
   headers: IncomingHttpHeaders,
@@ -90,21 +93,31 @@ export class GetTransactionsUseCase {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const url = new URL('/api/v1/transactions', this.paymentServiceBaseUrl);
-      appendQueryParams(url, args.query);
+      return await paymentServiceCircuitBreaker.execute(
+        async () => {
+          const url = new URL(
+            '/api/v1/transactions',
+            this.paymentServiceBaseUrl,
+          );
+          appendQueryParams(url, args.query);
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: pickForwardHeaders(args.headers, args.auth),
-        signal: controller.signal,
-      });
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: pickForwardHeaders(args.headers, args.auth),
+            signal: controller.signal,
+          });
 
-      const { contentType, data } = await readResponseBody(response);
-      return {
-        status: response.status,
-        contentType,
-        data: data as GetTransactionsOutput,
-      };
+          const { contentType, data } = await readResponseBody(response);
+          return {
+            status: response.status,
+            contentType,
+            data: data as GetTransactionsOutput,
+          };
+        },
+        {
+          isFailure: (result) => result.status >= 500,
+        },
+      );
     } finally {
       clearTimeout(timeout);
     }

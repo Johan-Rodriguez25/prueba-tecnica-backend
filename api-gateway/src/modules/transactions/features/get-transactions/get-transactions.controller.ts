@@ -1,8 +1,11 @@
-import type { Request, Response } from "express";
-import { GetTransactionsUseCase } from "./get-transactions.use-case";
+import type { Request, Response } from 'express';
+import { GetTransactionsUseCase } from './get-transactions.use-case';
+import { CircuitBreakerOpenError } from '../../../main/resilience/circuit-breaker';
 
 export class GetTransactionsController {
-  constructor(private readonly getTransactionsUseCase: GetTransactionsUseCase) {}
+  constructor(
+    private readonly getTransactionsUseCase: GetTransactionsUseCase,
+  ) {}
 
   async handle(req: Request, res: Response): Promise<void> {
     try {
@@ -13,19 +16,26 @@ export class GetTransactionsController {
       });
 
       if (result.contentType) {
-        res.setHeader("content-type", result.contentType);
+        res.setHeader('content-type', result.contentType);
       }
 
-      if (typeof result.data === "string") {
+      if (typeof result.data === 'string') {
         res.status(result.status).send(result.data);
         return;
       }
 
       res.status(result.status).json(result.data);
     } catch (error) {
-      const isAbortError = error instanceof Error && error.name === "AbortError";
+      if (error instanceof CircuitBreakerOpenError) {
+        res.status(503).json({ message: 'payment-service unavailable' });
+        return;
+      }
+      const isAbortError =
+        error instanceof Error && error.name === 'AbortError';
       res.status(isAbortError ? 504 : 502).json({
-        message: isAbortError ? "payment-service timeout" : "payment-service unavailable",
+        message: isAbortError
+          ? 'payment-service timeout'
+          : 'payment-service unavailable',
       });
     }
   }
